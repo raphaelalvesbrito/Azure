@@ -1,0 +1,298 @@
+#Copia dados de uma Azure Blob Storage para um Azure SQL Database.
+
+{
+  "name": "CopyDataPipeline",
+  "properties": {
+    "activities": [
+      {
+        "name": "CopyBlobToSQL",
+        "type": "Copy",
+        "inputs": [
+          {
+            "referenceName": "BlobDataset",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "SqlDataset",
+            "type": "DatasetReference"
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "AzureBlobSource"
+          },
+          "sink": {
+            "type": "SqlSink"
+          }
+        }
+      }
+    ]
+  }
+}
+Definições de Dataset (Referências):
+BlobDataset (origem):
+
+{
+  "name": "BlobDataset",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "AzureBlobStorageLinkedService",
+      "type": "LinkedServiceReference"
+    },
+    "type": "AzureBlob",
+    "typeProperties": {
+      "filePath": "input/data.csv",
+      "folderPath": "input"
+    }
+  }
+}
+SqlDataset (destino):
+json
+Copiar
+{
+  "name": "SqlDataset",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "AzureSqlDatabaseLinkedService",
+      "type": "LinkedServiceReference"
+    },
+    "type": "SqlServerTable",
+    "typeProperties": {
+      "tableName": "dbo.TableName"
+    }
+  }
+}
+Linked Services:
+Azure Blob Storage Linked Service:
+json
+Copiar
+{
+  "name": "AzureBlobStorageLinkedService",
+  "properties": {
+    "type": "AzureBlobStorage",
+    "typeProperties": {
+      "connectionString": "DefaultEndpointsProtocol=https;AccountName=your_account_name;AccountKey=your_account_key"
+    }
+  }
+}
+Azure SQL Database Linked Service:
+
+{
+  "name": "AzureSqlDatabaseLinkedService",
+  "properties": {
+    "type": "AzureSqlDatabase",
+    "typeProperties": {
+      "connectionString": "Server=tcp:your_server.database.windows.net,1433;Database=your_database;User ID=your_username;Password=your_password"
+    }
+  }
+}
+
+#Data Flow Activity para transformar dados antes de carregá-los em um destino.
+
+{
+  "name": "DataFlowPipeline",
+  "properties": {
+    "activities": [
+      {
+        "name": "TransformData",
+        "type": "DataFlow",
+        "typeProperties": {
+          "dataFlow": {
+            "referenceName": "DataFlow1",
+            "type": "DataFlowReference"
+          }
+        }
+      }
+    ]
+  }
+}
+
+{
+  "name": "DataFlow1",
+  "properties": {
+    "type": "MappingDataFlow",
+    "sources": [
+      {
+        "name": "Source1",
+        "type": "AzureBlobSource",
+        "dataset": {
+          "referenceName": "BlobDataset",
+          "type": "DatasetReference"
+        }
+      }
+    ],
+    "sinks": [
+      {
+        "name": "Sink1",
+        "type": "AzureSqlSink",
+        "dataset": {
+          "referenceName": "SqlDataset",
+          "type": "DatasetReference"
+        }
+      }
+    ],
+    "transformations": [
+      {
+        "name": "SelectColumns",
+        "type": "Select",
+        "transformation": {
+          "select": {
+            "columns": [
+              "column1",
+              "column2",
+              "column3"
+            ]
+          }
+        }
+      },
+      {
+        "name": "FilterRows",
+        "type": "Filter",
+        "transformation": {
+          "condition": "column1 > 100"
+        }
+      }
+    ]
+  }
+}
+
+#trigger para que um pipeline seja executado automaticamente em horários específicos. O pipeline será executado todos os dias à meia-noite.
+
+{
+  "name": "DailyTrigger",
+  "properties": {
+    "type": "Schedule",
+    "typeProperties": {
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "startTime": "2025-02-07T00:00:00Z",
+        "timeZone": "UTC"
+      }
+    }
+  }
+}
+
+{
+  "name": "PipelineWithTrigger",
+  "properties": {
+    "activities": [
+      {
+        "name": "CopyBlobToSQL",
+        "type": "Copy",
+        "inputs": [
+          {
+            "referenceName": "BlobDataset",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "SqlDataset",
+            "type": "DatasetReference"
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "AzureBlobSource"
+          },
+          "sink": {
+            "type": "SqlSink"
+          }
+        }
+      }
+    ],
+    "scheduler": {
+      "type": "TriggerReference",
+      "referenceName": "DailyTrigger"
+    }
+  }
+}
+
+#executar uma stored procedure no Azure SQL Database como parte de um pipeline.
+
+{
+  "name": "ExecuteStoredProcedurePipeline",
+  "properties": {
+    "activities": [
+      {
+        "name": "ExecuteSQLProcedure",
+        "type": "SqlServerStoredProcedure",
+        "linkedServiceName": {
+          "referenceName": "AzureSqlDatabaseLinkedService",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "dbo.myStoredProcedure",
+          "storedProcedureParameters": {
+            "param1": {
+              "value": "value1",
+              "type": "String"
+            },
+            "param2": {
+              "value": "value2",
+              "type": "String"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+
+#If Condition Activity para decidir se a cópia de dados deve ocorrer com base em uma condição.
+
+{
+  "name": "ConditionalCopyPipeline",
+  "properties": {
+    "activities": [
+      {
+        "name": "CheckCondition",
+        "type": "IfCondition",
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(variables('rowCount'), 0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "CopyBlobToSQL",
+              "type": "Copy",
+              "inputs": [
+                {
+                  "referenceName": "BlobDataset",
+                  "type": "DatasetReference"
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "SqlDataset",
+                  "type": "DatasetReference"
+                }
+              ],
+              "typeProperties": {
+                "source": {
+                  "type": "AzureBlobSource"
+                },
+                "sink": {
+                  "type": "SqlSink"
+                }
+              }
+            }
+          ],
+          "ifFalseActivities": [
+            {
+              "name": "LogNoData",
+              "type": "AzureFunctionActivity",
+              "typeProperties": {
+                "functionName": "LogNoDataFunction"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
